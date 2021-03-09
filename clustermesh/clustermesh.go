@@ -597,12 +597,14 @@ func (k *K8sClusterMesh) Enable(ctx context.Context) error {
 }
 
 type accessInformation struct {
-	ServiceIPs  []string
-	ServicePort int
-	ClusterName string
-	CA          []byte
-	ClientCert  []byte
-	ClientKey   []byte
+	ServiceIPs           []string
+	ServicePort          int
+	ClusterName          string
+	CA                   []byte
+	ClientCert           []byte
+	ClientKey            []byte
+	ExternalWorkloadCert []byte
+	ExternalWorkloadKey  []byte
 }
 
 func (ai *accessInformation) etcdConfiguration() string {
@@ -663,12 +665,29 @@ func (k *K8sClusterMesh) extractAccessInformation(ctx context.Context, client k8
 		return nil, fmt.Errorf("secret %q does not contain key %q", defaults.ClusterMeshClientSecretName, defaults.ClusterMeshClientSecretCertName)
 	}
 
+	externalWorkloadSecret, err := client.GetSecret(ctx, k.params.Namespace, defaults.ClusterMeshExternalWorkloadSecretName, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("unable to get secret %q to access clustermesh service: %s", defaults.ClusterMeshExternalWorkloadSecretName, err)
+	}
+
+	externalWorkloadKey, ok := externalWorkloadSecret.Data[defaults.ClusterMeshExternalWorkloadSecretKeyName]
+	if !ok {
+		return nil, fmt.Errorf("secret %q does not contain key %q", defaults.ClusterMeshExternalWorkloadSecretName, defaults.ClusterMeshExternalWorkloadSecretKeyName)
+	}
+
+	externalWorkloadCert, ok := externalWorkloadSecret.Data[defaults.ClusterMeshExternalWorkloadSecretCertName]
+	if !ok {
+		return nil, fmt.Errorf("secret %q does not contain key %q", defaults.ClusterMeshExternalWorkloadSecretName, defaults.ClusterMeshExternalWorkloadSecretCertName)
+	}
+
 	ai := &accessInformation{
-		ClusterName: cm.Data[configNameClusterName],
-		CA:          caCert,
-		ClientKey:   clientKey,
-		ClientCert:  clientCert,
-		ServiceIPs:  []string{},
+		ClusterName:          cm.Data[configNameClusterName],
+		CA:                   caCert,
+		ClientKey:            clientKey,
+		ClientCert:           clientCert,
+		ExternalWorkloadKey:  externalWorkloadKey,
+		ExternalWorkloadCert: externalWorkloadCert,
+		ServiceIPs:           []string{},
 	}
 
 	switch {
