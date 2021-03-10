@@ -127,7 +127,8 @@ func (k *K8sClusterMesh) generateService() *corev1.Service {
 			svc.Spec.Type = corev1.ServiceTypeLoadBalancer
 			svc.ObjectMeta.Annotations["service.beta.kubernetes.io/aws-load-balancer-internal"] = "0.0.0.0/0"
 		default:
-			svc.Spec.Type = corev1.ServiceTypeClusterIP
+			svc.Spec.Type = corev1.ServiceTypeNodePort
+			svc.Spec.Ports[0].NodePort = 32379
 		}
 	}
 
