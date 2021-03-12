@@ -463,7 +463,7 @@ func (k *K8sClusterMesh) Log(format string, a ...interface{}) {
 	fmt.Fprintf(k.params.Writer, format+"\n", a...)
 }
 
-func (k *K8sClusterMesh) Validate(ctx context.Context) error {
+func (k *K8sClusterMesh) Validate(ctx context.Context, requireNondefaultCluster bool) error {
 	f, err := k.client.AutodetectFlavor(ctx)
 	if err != nil {
 		return err
@@ -489,8 +489,12 @@ func (k *K8sClusterMesh) Validate(ctx context.Context) error {
 	}
 
 	if clusterID == "" || clusterID == "0" {
-		k.Log("❌ Cluster ID (%q) must be set to a value > 0", configNameClusterID)
-		failures++
+		if requireNondefaultCluster {
+			k.Log("❌ Cluster ID (%q) must be set to a value > 0", configNameClusterID)
+			failures++
+		} else {
+			clusterID = "0"
+		}
 	}
 	k.clusterID = clusterID
 
@@ -501,8 +505,12 @@ func (k *K8sClusterMesh) Validate(ctx context.Context) error {
 	}
 
 	if clusterName == "" || clusterName == "default" {
-		k.Log("❌ Cluster name (%q) must be set to a value other than \"default\"", configNameClusterName)
-		failures++
+		if requireNondefaultCluster {
+			k.Log("❌ Cluster name (%q) must be set to a value other than \"default\"", configNameClusterName)
+			failures++
+		} else {
+			clusterName = "default"
+		}
 	}
 	k.clusterName = clusterName
 
@@ -549,7 +557,7 @@ func (k *K8sClusterMesh) Enable(ctx context.Context) error {
 		return err
 	}
 
-	if err := k.Validate(ctx); err != nil {
+	if err := k.Validate(ctx, false); err != nil {
 		return err
 	}
 
@@ -797,6 +805,10 @@ func (k *K8sClusterMesh) patchConfig(ctx context.Context, client k8sClusterMeshI
 }
 
 func (k *K8sClusterMesh) Connect(ctx context.Context) error {
+	if err := k.Validate(ctx, true); err != nil {
+		return err
+	}
+
 	remoteCluster, err := k8s.NewClient(k.params.DestinationContext, "")
 	if err != nil {
 		return fmt.Errorf("unable to create Kubernetes client to access remote cluster %q: %w", k.params.DestinationContext, err)
